@@ -1,0 +1,65 @@
+version: '3.7'
+
+volumes::
+traefik:
+image: traefik
+command:
+- "--api=true"
+- "--api.insecure=true"
+- "--api.dashboard=true"
+- "--ping"
+- "--providers.docker=true"
+- "--providers.docker.endpoint=unix:///var/run/docker.sock"
+- "--providers.docker.network=traefik-public"
+- "--providers.docker.swarmMode=true"
+- "--entrypoints.web.address=:80"
+- "--accesslog=true"
+- "--accesslog.bufferingsize=100"
+- "--accesslog.filepath=/var/log/traefik.log"
+- "--metrics.prometheus=true"
+- "--entryPoints.metrics.address=:8082"
+- "--metrics.prometheus.entryPoint=metrics"
+- "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+- "--tracing.jaeger=true"
+- "--tracing.jaeger.samplingServerURL=http://localhost:5778/sampling"
+- "--tracing.jaeger.samplingType=const"
+- "--tracing.jaeger.samplingParam=1.0"
+- "--tracing.jaeger.localAgentHostPort=127.0.0.1:6831"
+- "--tracing.jaeger.propagation=jaeger"
+- "--tracing.jaeger.traceContextHeaderName=uber-trace-id"
+networks:
+monitor-net:
+traefik-public:
+driver: overlay
+external: true
+
+And then a service is added through another stack with the following configuration. This is running on a docker node in the swarm:
+
+version: '3.7'
+services:
+frontend:
+image: enevodocker/enevoleadsfe:production
+ports:
+- 80
+environment:
+- SERVICE_PORTS=80
+deploy:
+labels:
+- "traefik.http.routers.portalproxy.rule=Host(myportal.no)"
+- "traefik.http.services.portalservice.loadbalancer.server.port=80"
+- "traefik.docker.network=traefik-public"
+replicas: 4
+update_config:
+parallelism: 2
+delay: 10s
+restart_policy:
+condition: on-failure
+max_attempts: 2
+window: 60s
+placement:
+constraints: [node.role != manager]
+networks:
+- web
+- traefik-public
+labels:
+- "traefik.docker.network=traefik-public"

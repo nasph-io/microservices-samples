@@ -7,4 +7,4 @@ cd ../spring
 mvn clean
 echo -e "SpringBoot - Clean OK"
 
-echo -e "nasf task finished"
+echo -e "nasph task finished"
